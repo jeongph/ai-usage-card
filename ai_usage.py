@@ -102,6 +102,26 @@ def add_usage(days, ts, usage, model):
     rec["records"] += 1
 
 
+LEVELS = "▁▂▃▄▅▆▇█"
+
+
+def render_graph(values):
+    """일별 값 리스트 -> (상단, 하단) 2줄 세로 막대.
+    그래프 줄에는 막대 문자만 담는다 (텍스트/이모지 금지)."""
+    maxv = max(values) if values else 0
+    maxv = maxv or 1
+    top, bot = [], []
+    for v in values:
+        h = v / maxv * 2.0
+        if v == 0:
+            bot.append("▁")
+        else:
+            bot.append(LEVELS[round(min(h, 1.0) * 7)])
+        ht = h - 1.0
+        top.append(" " if ht <= 0 else LEVELS[round(min(ht, 1.0) * 7)])
+    return "".join(top).rstrip(), "".join(bot)
+
+
 def human(n):
     for unit, div in (("B", 1e9), ("M", 1e6), ("K", 1e3)):
         if n >= div:

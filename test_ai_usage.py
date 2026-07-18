@@ -1,4 +1,4 @@
-from ai_usage import human, record_cost, parse_date, add_usage
+from ai_usage import human, record_cost, parse_date, add_usage, render_graph
 
 
 def test_parse_date_seoul():
@@ -55,3 +55,28 @@ def test_record_cost_cache_read_weighted():
     # cache_read 는 input_rate * 0.10
     cost = record_cost("claude-opus-4-8", {"cache_read_input_tokens": 1_000_000})
     assert round(cost, 6) == round(5.0 * 0.10, 6)
+
+
+def test_graph_all_zero_bottom_is_baseline():
+    top, bot = render_graph([0] * 30)
+    assert bot == "▁" * 30      # 안 쓴 날도 바닥 막대로 꽉 채움
+    assert top == ""             # 상단은 전부 비어 rstrip 결과 빈 문자열
+
+
+def test_graph_length_matches_input():
+    top, bot = render_graph([0] * 30)
+    assert len(bot) == 30
+
+
+def test_graph_peak_fills_both_rows():
+    vals = [0] * 29 + [100]
+    top, bot = render_graph(vals)
+    assert bot[-1] == "█"        # 최댓값 -> 하단 꽉
+    assert top[-1] == "█"        # 최댓값 -> 상단도 꽉 (h==2)
+
+
+def test_graph_half_max_only_bottom():
+    # 절반 값은 h==1.0 -> 하단 꽉, 상단 비움
+    top, bot = render_graph([50, 100] + [0] * 28)
+    assert bot[0] == "█"
+    assert top[:1] == " "        # 첫 칸 상단 공백
