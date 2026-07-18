@@ -3,11 +3,11 @@
 Claude Code 토큰 사용량을 GitHub 프로필 **pinned gist** 카드로 띄우는 단일 파이썬 스크립트.
 
 ```
-📊 7.8B tokens · $9,811.79 · 35 days
-🔥 today 10.4M · peak 943.9M (Jun 20)
- █▇▃       ▂   ▄▃
-▂███▃▃▂▇▃▂▂█▃▆▇██▆▂▄▂▁▁▁▂▂▄▂▂▁
-📅 avg 224.2M/day · $280/day
+📊 2.9B tokens · $3,110 · 35 days
+🔥 today 56.8M · peak 282.4M (Jun 20)
+📈 this week 238.0M ▼59% vs last
+📅 avg 82.1M/day · $89/day
+🏃 6-day streak
 ```
 
 > 프로필 pinned gist는 **첫 5줄만** 보입니다. 6번째 줄 `updated`는 gist를 열어야 보입니다.
@@ -20,7 +20,10 @@ Claude Code 토큰 사용량을 GitHub 프로필 **pinned gist** 카드로 띄�
    gh auth login
    gh auth refresh -h github.com -s gist
    ```
-1. 이 저장소를 받습니다: `git clone <repo-url> ~/ai-usage-card`
+1. 저장소를 받습니다:
+   ```sh
+   git clone https://github.com/jeongph/ai-usage-card.git ~/ai-usage-card
+   ```
 2. 빈 gist를 하나 만듭니다:
    ```sh
    echo "loading..." > claude-code-usage
@@ -33,14 +36,14 @@ Claude Code 토큰 사용량을 GitHub 프로필 **pinned gist** 카드로 띄�
    ```
 4. 수동 테스트:
    ```sh
-   python3 ~/ai-usage-card/ai_usage.py --push
+   python3 ~/ai-usage-card/src/ai_usage.py --push
    ```
    끝에 `pushed`가 뜨면 성공. gist를 새로고침하면 카드가 보입니다.
 5. Claude Code Stop 훅 등록 — `~/.claude/settings.json`:
    ```json
    { "hooks": { "Stop": [ { "hooks": [
      { "type": "command",
-       "command": "AI_USAGE_GIST_ID=<복사한_ID> python3 $HOME/ai-usage-card/ai_usage.py --push --quiet" }
+       "command": "AI_USAGE_GIST_ID=<복사한_ID> python3 $HOME/ai-usage-card/src/ai_usage.py --push --quiet" }
    ] } ] } }
    ```
    응답이 끝날 때마다 실행되지만 **하루 1회만** 실제 push 합니다 (`.last_push` 디바운스).
@@ -48,11 +51,32 @@ Claude Code 토큰 사용량을 GitHub 프로필 **pinned gist** 카드로 띄�
 
 ## 옵션
 
-- 타임존: `ai_usage.py` 상단 `TZ_NAME` 수정.
-- 강제 재갱신: `rm ~/ai-usage-card/.last_push && python3 ~/ai-usage-card/ai_usage.py --push`
+- 타임존: `src/ai_usage.py` 상단 `TZ_NAME` 수정 (기본 `Asia/Seoul`).
+- 강제 재갱신: `rm ~/ai-usage-card/.last_push && python3 ~/ai-usage-card/src/ai_usage.py --push`
 - 로그 보관 연장(선택): `~/.claude/settings.json` 에 `{ "cleanupPeriodDays": 90 }`.
+
+## 카드에 표시되는 것
+
+| 줄 | 내용 |
+|----|------|
+| 📊 | 총 토큰 · 비용 · 활동일수 |
+| 🔥 | 오늘 사용량 · 최고 사용일 |
+| 📈 | 이번 주 추세 (지난주 대비 증감) |
+| 📅 | 일평균 토큰 · 비용 |
+| 🏃 | 연속 사용일(streak) |
 
 ## 동작 원리
 
 `~/.claude/projects/**/*.jsonl` 을 파싱해 날짜별 토큰을 합산합니다. **메시지 내용은 읽지 않고**
-timestamp·모델·usage 토큰 수만 사용합니다. 카드는 최근 30일을 2줄 세로 막대로 그립니다.
+timestamp·모델·usage 토큰 수만 사용합니다.
+
+- **토큰** = `input + output + cache_creation + cache_read` (ccusage·ai-token-monitor와 동일 정의).
+- **중복 제거**: 재시도·분기·서브에이전트 replay로 생기는 중복 레코드는 `message.id + requestId` 로 dedup.
+- **비용**: 모델별 정가(list price)와 캐시 배수(cache write 1.25~2×, cache read 0.1×)로 환산.
+
+## 개발
+
+```sh
+pip install -r requirements-dev.txt
+python3 -m pytest          # pytest.ini 의 pythonpath=src 로 src 를 인식
+```
