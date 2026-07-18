@@ -1,5 +1,6 @@
+import json as _json
 from datetime import date
-from ai_usage import human, record_cost, parse_date, add_usage, render_graph, render_card
+from ai_usage import human, record_cost, parse_date, add_usage, render_graph, render_card, aggregate, upsert
 
 
 def test_parse_date_seoul():
@@ -112,3 +113,28 @@ def test_render_card_graph_rows_have_no_text():
 
 def test_render_card_empty():
     assert render_card({}, date(2026, 7, 18), "x") == "(no usage data yet)\n"
+
+
+def test_aggregate_reads_usage_lines(tmp_path):
+    log = tmp_path / "proj" / "s.jsonl"
+    log.parent.mkdir(parents=True)
+    rows = [
+        {"timestamp": "2026-07-17T16:00:00.000Z",
+         "message": {"model": "claude-opus-4-8",
+                     "usage": {"input_tokens": 10, "output_tokens": 20}}},
+        {"type": "summary"},  # usage 없는 줄은 무시
+    ]
+    log.write_text("\n".join(_json.dumps(r) for r in rows), encoding="utf-8")
+
+    days = aggregate(str(tmp_path))
+    assert days["2026-07-18"]["input"] == 10
+    assert days["2026-07-18"]["output"] == 20
+
+
+def test_upsert_latest_wins(tmp_path):
+    data = tmp_path / "data.json"
+    upsert({"2026-07-18": {"input": 1, "output": 0, "cache_creation": 0,
+                           "cache_read": 0, "records": 1, "cost": 0.0}}, str(data))
+    store = upsert({"2026-07-18": {"input": 99, "output": 0, "cache_creation": 0,
+                                   "cache_read": 0, "records": 1, "cost": 0.0}}, str(data))
+    assert store["days"]["2026-07-18"]["input"] == 99  # 최신 파싱이 덮어씀

@@ -34,6 +34,12 @@ PRICING = {
     "claude-haiku-4-5": (1.0, 5.0),
 }
 
+LOG_ROOT = os.path.expanduser("~/.claude/projects")
+HERE = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH = os.path.join(HERE, "data.json")
+CARD_PATH = os.path.join(HERE, "card.txt")
+LAST_PUSH = os.path.join(HERE, ".last_push")
+
 
 def _rates(model):
     if not model:
@@ -160,3 +166,44 @@ def render_card(days, today, updated_str):
         f"📅 avg {human(avg)}/day · ${cost_day:.0f}/day",
         f"🕐 updated {updated_str}",
     ]) + "\n"
+
+
+def aggregate(root):
+    days = {}
+    for f in glob.glob(os.path.join(root, "**", "*.jsonl"), recursive=True):
+        try:
+            with open(f, encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        o = json.loads(line)
+                    except Exception:
+                        continue
+                    if not isinstance(o, dict):
+                        continue
+                    msg = o.get("message")
+                    if not isinstance(msg, dict):
+                        continue
+                    usage = msg.get("usage")
+                    if not isinstance(usage, dict):
+                        continue
+                    add_usage(days, o.get("timestamp"), usage, msg.get("model"))
+        except Exception as e:
+            print(f"read error {f}: {e}", file=sys.stderr)
+    return days
+
+
+def upsert(fresh, data_path):
+    store = {"days": {}, "tz": TZ_NAME}
+    if os.path.exists(data_path):
+        try:
+            with open(data_path, encoding="utf-8") as fh:
+                store = json.load(fh)
+        except Exception:
+            pass
+    store.setdefault("days", {})
+    store["days"].update(fresh)
+    store["tz"] = TZ_NAME
+    store["updated_at"] = datetime.now(_local_tz()).isoformat(timespec="seconds")
+    with open(data_path, "w", encoding="utf-8") as fh:
+        json.dump(store, fh, ensure_ascii=False, indent=2, sort_keys=True)
+    return store
