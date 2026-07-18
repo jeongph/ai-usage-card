@@ -238,3 +238,31 @@ def push_gist(card, gist_id, last_push_path, today_str):
     with open(last_push_path, "w", encoding="utf-8") as fh:
         fh.write(today_str)
     return "pushed"
+
+
+def main():
+    argv = sys.argv
+    tz = _local_tz()
+    today = datetime.now(tz).date()
+    today_str = today.isoformat()
+
+    if "--push" in argv and (not GIST_ID or "PUT_YOUR" in GIST_ID
+                             or pushed_today(LAST_PUSH, today_str)):
+        return  # fast path: 오늘 이미 push 했으면 파싱도 건너뜀
+
+    fresh = aggregate(LOG_ROOT)
+    store = upsert(fresh, DATA_PATH)
+    updated_str = datetime.now(tz).strftime("%Y-%m-%d %H:%M") + " KST"
+    card = render_card(store.get("days", {}), today, updated_str)
+
+    with open(CARD_PATH, "w", encoding="utf-8") as fh:
+        fh.write(card)
+
+    if "--push" in argv:
+        print(push_gist(card, GIST_ID, LAST_PUSH, today_str), file=sys.stderr)
+    if "--quiet" not in argv:
+        sys.stdout.write(card)
+
+
+if __name__ == "__main__":
+    main()
