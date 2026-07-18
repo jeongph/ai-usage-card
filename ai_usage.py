@@ -40,6 +40,9 @@ DATA_PATH = os.path.join(HERE, "data.json")
 CARD_PATH = os.path.join(HERE, "card.txt")
 LAST_PUSH = os.path.join(HERE, ".last_push")
 
+GIST_ID = os.environ.get("AI_USAGE_GIST_ID", "").strip() or "PUT_YOUR_GIST_ID_HERE"
+GIST_FILENAME = "claude-code-usage"
+
 
 def _rates(model):
     if not model:
@@ -207,3 +210,31 @@ def upsert(fresh, data_path):
     with open(data_path, "w", encoding="utf-8") as fh:
         json.dump(store, fh, ensure_ascii=False, indent=2, sort_keys=True)
     return store
+
+
+def pushed_today(last_push_path, today_str):
+    if not os.path.exists(last_push_path):
+        return False
+    try:
+        return open(last_push_path, encoding="utf-8").read().strip() == today_str
+    except Exception:
+        return False
+
+
+def push_gist(card, gist_id, last_push_path, today_str):
+    if not gist_id or "PUT_YOUR" in gist_id:
+        return "skipped (GIST_ID not set)"
+    if pushed_today(last_push_path, today_str):
+        return "skipped (already pushed today)"
+    payload = json.dumps({"files": {GIST_FILENAME: {"content": card}}})
+    try:
+        p = subprocess.run(
+            ["gh", "api", "-X", "PATCH", f"/gists/{gist_id}", "--input", "-"],
+            input=payload, text=True, capture_output=True, timeout=60)
+    except Exception as e:
+        return f"push error: {e}"
+    if p.returncode != 0:
+        return "push failed: " + (p.stderr or "").strip()[:200]
+    with open(last_push_path, "w", encoding="utf-8") as fh:
+        fh.write(today_str)
+    return "pushed"

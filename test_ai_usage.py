@@ -1,6 +1,6 @@
 import json as _json
 from datetime import date
-from ai_usage import human, record_cost, parse_date, add_usage, render_graph, render_card, aggregate, upsert
+from ai_usage import human, record_cost, parse_date, add_usage, render_graph, render_card, aggregate, upsert, pushed_today, push_gist
 
 
 def test_parse_date_seoul():
@@ -138,3 +138,26 @@ def test_upsert_latest_wins(tmp_path):
     store = upsert({"2026-07-18": {"input": 99, "output": 0, "cache_creation": 0,
                                    "cache_read": 0, "records": 1, "cost": 0.0}}, str(data))
     assert store["days"]["2026-07-18"]["input"] == 99  # 최신 파싱이 덮어씀
+
+
+def test_pushed_today_false_when_missing(tmp_path):
+    assert pushed_today(str(tmp_path / "nope"), "2026-07-18") is False
+
+
+def test_pushed_today_true_when_matches(tmp_path):
+    p = tmp_path / ".last_push"
+    p.write_text("2026-07-18", encoding="utf-8")
+    assert pushed_today(str(p), "2026-07-18") is True
+    assert pushed_today(str(p), "2026-07-19") is False
+
+
+def test_push_gist_skips_without_id(tmp_path):
+    msg = push_gist("card", "", str(tmp_path / ".last_push"), "2026-07-18")
+    assert "skip" in msg.lower()
+
+
+def test_push_gist_skips_when_already_pushed(tmp_path):
+    p = tmp_path / ".last_push"
+    p.write_text("2026-07-18", encoding="utf-8")
+    msg = push_gist("card", "someid", str(p), "2026-07-18")
+    assert "already" in msg.lower()
