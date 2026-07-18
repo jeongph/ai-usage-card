@@ -6,6 +6,21 @@ pipeline: ~/.claude/projects/**/*.jsonl 파싱 -> 날짜별 토큰 집계
 메시지 내용은 읽지 않고 timestamp/model/usage 토큰 수만 사용한다.
 """
 
+import glob
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime, date, timedelta
+
+try:
+    from zoneinfo import ZoneInfo
+except Exception:
+    ZoneInfo = None
+
+TZ_NAME = "Asia/Seoul"
+COMPONENTS = ("input", "output", "cache_creation", "cache_read")
+
 # $ per 1M tokens: (input_rate, output_rate). List price; prefix 매칭.
 PRICING = {
     "claude-fable-5": (10.0, 50.0),
@@ -47,6 +62,44 @@ def record_cost(model, usage):
             + cc5 * in_rate * 1.25
             + cc1 * in_rate * 2.0
             + read * in_rate * 0.10) / 1_000_000.0
+
+
+def _local_tz():
+    if ZoneInfo is not None:
+        try:
+            return ZoneInfo(TZ_NAME)
+        except Exception:
+            pass
+    return None
+
+
+def parse_date(ts):
+    if not isinstance(ts, str) or len(ts) < 10:
+        return None
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    dt = dt.astimezone(_local_tz())
+    return dt.date().isoformat()
+
+
+def empty_day():
+    return {"input": 0, "output": 0, "cache_creation": 0,
+            "cache_read": 0, "records": 0, "cost": 0.0}
+
+
+def add_usage(days, ts, usage, model):
+    d = parse_date(ts)
+    if d is None:
+        return
+    rec = days.setdefault(d, empty_day())
+    rec["input"] += int(usage.get("input_tokens") or 0)
+    rec["output"] += int(usage.get("output_tokens") or 0)
+    rec["cache_creation"] += int(usage.get("cache_creation_input_tokens") or 0)
+    rec["cache_read"] += int(usage.get("cache_read_input_tokens") or 0)
+    rec["cost"] += record_cost(model, usage)
+    rec["records"] += 1
 
 
 def human(n):
