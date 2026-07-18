@@ -1,7 +1,7 @@
 import json as _json
 from datetime import date
 from unittest import mock
-from ai_usage import human, record_cost, parse_date, add_usage, render_heatmap, render_card, aggregate, upsert, pushed_today, push_gist, SHADE
+from ai_usage import human, record_cost, parse_date, add_usage, render_card, aggregate, upsert, pushed_today, push_gist
 
 
 def test_parse_date_seoul():
@@ -60,58 +60,58 @@ def test_record_cost_cache_read_weighted():
     assert round(cost, 6) == round(5.0 * 0.10, 6)
 
 
-def test_heatmap_all_zero_is_blank():
-    hm = render_heatmap([0] * 30)
-    assert len(hm) == 30
-    assert hm == " " * 30
-
-
-def test_heatmap_length_matches_input():
-    hm = render_heatmap([0] * 30)
-    assert len(hm) == 30
-
-
-def test_heatmap_max_value_is_darkest_shade():
-    vals = [0] * 29 + [100]
-    hm = render_heatmap(vals)
-    assert hm[-1] == "█"
-
-
-def test_heatmap_small_nonzero_is_some_shade():
-    vals = [1] + [100] + [0] * 28
-    hm = render_heatmap(vals)
-    assert hm[0] in SHADE
-    assert hm[0] != " "
-
-
 def _mk(day, total, cost):
     # 전량 input 으로 몰아 total 토큰을 맞춘 하루치 레코드
     return {"input": total, "output": 0, "cache_creation": 0,
             "cache_read": 0, "records": 1, "cost": cost}
 
 
-def test_render_card_has_five_lines_and_markers():
+def test_render_card_has_six_lines_and_markers():
     days = {"2026-07-18": _mk("d", 10_000_000, 2.0),
             "2026-07-15": _mk("d", 100_000_000, 20.0)}
     card = render_card(days, date(2026, 7, 18), "2026-07-18 13:40 KST")
     lines = card.rstrip("\n").split("\n")
-    assert len(lines) == 5
+    assert len(lines) == 6
     assert lines[0].startswith("📊 ")
     assert lines[1].startswith("🔥 today ")
+    assert lines[2].startswith("📈 this week ")
     assert lines[3].startswith("📅 avg ")
-    assert lines[4].startswith("🕐 updated ")
-
-
-def test_render_card_heatmap_row_has_no_text():
-    days = {"2026-07-18": _mk("d", 10_000_000, 2.0)}
-    card = render_card(days, date(2026, 7, 18), "2026-07-18 13:40 KST")
-    heatmap = card.split("\n")[2]
-    # 히트맵 줄은 농도 문자/공백만 (알파벳·이모지 없음)
-    assert all(ch in " ░▒▓█" for ch in heatmap)
+    assert lines[4].startswith("⚡ ")
+    assert lines[4].endswith("-day streak")
+    assert lines[5].startswith("🕐 updated ")
 
 
 def test_render_card_empty():
     assert render_card({}, date(2026, 7, 18), "x") == "(no usage data yet)\n"
+
+
+def test_render_card_trend_and_streak():
+    today = date(2026, 7, 18)
+    days = {}
+    # 최근 7일(07-12~07-18): 07-15만 기록이 없어(=0) streak 을 3에서 끊는다
+    for day, total in [
+        ("2026-07-18", 2_000_000),
+        ("2026-07-17", 1_000_000),
+        ("2026-07-16", 1_000_000),
+        ("2026-07-14", 1_000_000),
+        ("2026-07-13", 1_000_000),
+        ("2026-07-12", 1_000_000),
+    ]:
+        days[day] = _mk(day, total, 0.0)
+    # 이전 7일(07-05~07-11): 각 500K
+    for day in ("2026-07-11", "2026-07-10", "2026-07-09", "2026-07-08",
+                "2026-07-07", "2026-07-06", "2026-07-05"):
+        days[day] = _mk(day, 500_000, 0.0)
+
+    card = render_card(days, today, "2026-07-18 13:40 KST")
+    lines = card.rstrip("\n").split("\n")
+
+    # last7 = 2M+1M+1M+0+1M+1M+1M = 7.0M, prev7 = 7*500K = 3.5M
+    # pct = (7.0M-3.5M)/3.5M*100 = +100% -> ▲
+    assert "▲100%" in lines[2]
+    assert lines[2].startswith("📈 this week 7.0M")
+    # streak: 07-18/17/16 은 값이 있고 07-15 가 비어(0) 있어 끊긴다 -> 3
+    assert lines[4] == "⚡ 3-day streak"
 
 
 def test_aggregate_reads_usage_lines(tmp_path):

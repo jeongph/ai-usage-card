@@ -2,7 +2,7 @@
 """Claude Code AI 토큰 사용량 카드.
 
 pipeline: ~/.claude/projects/**/*.jsonl 파싱 -> 날짜별 토큰 집계
--> data.json 누적 -> 5줄 gist 카드 렌더 -> gh api 로 gist push.
+-> data.json 누적 -> 6줄 gist 카드 렌더 -> gh api 로 gist push.
 메시지 내용은 읽지 않고 timestamp/model/usage 토큰 수만 사용한다.
 """
 
@@ -111,22 +111,6 @@ def add_usage(days, ts, usage, model):
     rec["records"] += 1
 
 
-SHADE = "░▒▓█"
-
-
-def render_heatmap(values):
-    """일별 값 리스트 -> 1줄 농도 히트맵. 0인 날은 공백, 그 외 농도 4단계."""
-    maxv = max(values) if values else 0
-    maxv = maxv or 1
-    out = []
-    for v in values:
-        if v == 0:
-            out.append(" ")
-        else:
-            out.append(SHADE[min(3, int(v / maxv * 4))])
-    return "".join(out)
-
-
 def human(n):
     for unit, div in (("B", 1e9), ("M", 1e6), ("K", 1e3)):
         if n >= div:
@@ -143,8 +127,6 @@ def render_card(days, today, updated_str):
         return "(no usage data yet)\n"
 
     totals = {d: day_total(r) for d, r in days.items()}
-    window = [today - timedelta(days=29 - i) for i in range(30)]
-    vals = [totals.get(d.isoformat(), 0) for d in window]
 
     grand = sum(totals.values())
     total_cost = sum(float(r.get("cost") or 0) for r in days.values())
@@ -156,11 +138,31 @@ def render_card(days, today, updated_str):
     cost_day = total_cost / active if active else 0
     peak_lbl = datetime.fromisoformat(peak_d).strftime("%b %d").replace(" 0", " ")
 
+    def window_sum(start, end):
+        return sum(totals.get((today - timedelta(days=i)).isoformat(), 0)
+                   for i in range(start, end))
+
+    last7 = window_sum(0, 7)
+    prev7 = window_sum(7, 14)
+    if prev7:
+        pct = (last7 - prev7) / prev7 * 100
+        arrow = "▲" if pct >= 0 else "▼"
+        trend = f"📈 this week {human(last7)} {arrow}{abs(pct):.0f}% vs last"
+    else:
+        trend = f"📈 this week {human(last7)}"
+
+    streak = 0
+    d = today
+    while totals.get(d.isoformat(), 0) > 0:
+        streak += 1
+        d -= timedelta(days=1)
+
     return "\n".join([
         f"📊 {human(grand)} tokens · ${total_cost:,.2f} · {active} days",
         f"🔥 today {human(today_v)} · peak {human(peak_v)} ({peak_lbl})",
-        render_heatmap(vals),
+        trend,
         f"📅 avg {human(avg)}/day · ${cost_day:.0f}/day",
+        f"⚡ {streak}-day streak",
         f"🕐 updated {updated_str}",
     ]) + "\n"
 
