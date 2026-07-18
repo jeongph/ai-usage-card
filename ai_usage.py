@@ -127,3 +127,36 @@ def human(n):
         if n >= div:
             return f"{n/div:.1f}{unit}"
     return str(int(n))
+
+
+def day_total(rec):
+    return sum(int(rec.get(c) or 0) for c in COMPONENTS)
+
+
+def render_card(days, today, updated_str):
+    if not days:
+        return "(no usage data yet)\n"
+
+    totals = {d: day_total(r) for d, r in days.items()}
+    window = [today - timedelta(days=29 - i) for i in range(30)]
+    vals = [totals.get(d.isoformat(), 0) for d in window]
+    top, bot = render_graph(vals)
+
+    grand = sum(totals.values())
+    total_cost = sum(float(r.get("cost") or 0) for r in days.values())
+    active = sum(1 for t in totals.values() if t > 0)
+    today_v = totals.get(today.isoformat(), 0)
+    peak_d = max(totals, key=lambda d: totals[d])
+    peak_v = totals[peak_d]
+    avg = grand / active if active else 0
+    cost_day = total_cost / active if active else 0
+    peak_lbl = datetime.fromisoformat(peak_d).strftime("%b %d").replace(" 0", " ")
+
+    return "\n".join([
+        f"📊 {human(grand)} tokens · ${total_cost:,.2f} · {active} days",
+        f"🔥 today {human(today_v)} · peak {human(peak_v)} ({peak_lbl})",
+        top,
+        bot,
+        f"📅 avg {human(avg)}/day · ${cost_day:.0f}/day",
+        f"🕐 updated {updated_str}",
+    ]) + "\n"

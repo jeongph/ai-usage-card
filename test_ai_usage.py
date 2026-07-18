@@ -1,4 +1,5 @@
-from ai_usage import human, record_cost, parse_date, add_usage, render_graph
+from datetime import date
+from ai_usage import human, record_cost, parse_date, add_usage, render_graph, render_card
 
 
 def test_parse_date_seoul():
@@ -80,3 +81,34 @@ def test_graph_half_max_only_bottom():
     top, bot = render_graph([50, 100] + [0] * 28)
     assert bot[0] == "█"
     assert top[:1] == " "        # 첫 칸 상단 공백
+
+
+def _mk(day, total, cost):
+    # 전량 input 으로 몰아 total 토큰을 맞춘 하루치 레코드
+    return {"input": total, "output": 0, "cache_creation": 0,
+            "cache_read": 0, "records": 1, "cost": cost}
+
+
+def test_render_card_has_six_lines_and_markers():
+    days = {"2026-07-18": _mk("d", 10_000_000, 2.0),
+            "2026-07-15": _mk("d", 100_000_000, 20.0)}
+    card = render_card(days, date(2026, 7, 18), "2026-07-18 13:40 KST")
+    lines = card.rstrip("\n").split("\n")
+    assert len(lines) == 6
+    assert lines[0].startswith("📊 ")
+    assert lines[1].startswith("🔥 today ")
+    assert lines[4].startswith("📅 avg ")
+    assert lines[5].startswith("🕐 updated ")
+
+
+def test_render_card_graph_rows_have_no_text():
+    days = {"2026-07-18": _mk("d", 10_000_000, 2.0)}
+    card = render_card(days, date(2026, 7, 18), "2026-07-18 13:40 KST")
+    top, bot = card.split("\n")[2], card.split("\n")[3]
+    # 그래프 줄은 막대/공백만 (알파벳·이모지 없음)
+    assert all(ch in " " + "▁▂▃▄▅▆▇█" for ch in top)
+    assert all(ch in "▁▂▃▄▅▆▇█" for ch in bot)
+
+
+def test_render_card_empty():
+    assert render_card({}, date(2026, 7, 18), "x") == "(no usage data yet)\n"
