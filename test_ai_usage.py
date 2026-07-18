@@ -1,5 +1,6 @@
 import json as _json
 from datetime import date
+from unittest import mock
 from ai_usage import human, record_cost, parse_date, add_usage, render_graph, render_card, aggregate, upsert, pushed_today, push_gist
 
 
@@ -161,3 +162,15 @@ def test_push_gist_skips_when_already_pushed(tmp_path):
     p.write_text("2026-07-18", encoding="utf-8")
     msg = push_gist("card", "someid", str(p), "2026-07-18")
     assert "already" in msg.lower()
+
+
+def test_push_gist_success_writes_last_push(tmp_path):
+    lp = tmp_path / ".last_push"
+    fake = mock.Mock(returncode=0, stderr="")
+    with mock.patch("ai_usage.subprocess.run", return_value=fake) as m:
+        result = push_gist("card-text", "realid", str(lp), "2026-07-18")
+    assert result == "pushed"
+    assert lp.read_text() == "2026-07-18"
+    cmd = m.call_args.args[0]
+    assert cmd[:5] == ["gh", "api", "-X", "PATCH", "/gists/realid"]
+    assert "card-text" in m.call_args.kwargs["input"]

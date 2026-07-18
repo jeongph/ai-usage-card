@@ -203,6 +203,8 @@ def upsert(fresh, data_path):
                 store = json.load(fh)
         except Exception:
             pass
+    if not isinstance(store, dict):
+        store = {"days": {}, "tz": TZ_NAME}
     store.setdefault("days", {})
     store["days"].update(fresh)
     store["tz"] = TZ_NAME
@@ -252,7 +254,7 @@ def main():
 
     fresh = aggregate(LOG_ROOT)
     store = upsert(fresh, DATA_PATH)
-    updated_str = datetime.now(tz).strftime("%Y-%m-%d %H:%M") + " KST"
+    updated_str = datetime.now(tz).strftime("%Y-%m-%d %H:%M %Z")
     card = render_card(store.get("days", {}), today, updated_str)
 
     with open(CARD_PATH, "w", encoding="utf-8") as fh:
