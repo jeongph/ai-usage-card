@@ -1,0 +1,9 @@
+# 개인 사용량 데이터·산출물 (배포본에 포함하지 않음)
+data.json
+card.txt
+.last_push
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
