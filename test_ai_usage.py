@@ -1,7 +1,7 @@
 import json as _json
 from datetime import date
 from unittest import mock
-from ai_usage import human, record_cost, parse_date, add_usage, render_graph, render_card, aggregate, upsert, pushed_today, push_gist
+from ai_usage import human, record_cost, parse_date, add_usage, render_heatmap, render_card, aggregate, upsert, pushed_today, push_gist, SHADE
 
 
 def test_parse_date_seoul():
@@ -60,29 +60,28 @@ def test_record_cost_cache_read_weighted():
     assert round(cost, 6) == round(5.0 * 0.10, 6)
 
 
-def test_graph_all_zero_bottom_is_baseline():
-    top, bot = render_graph([0] * 30)
-    assert bot == "▁" * 30      # 안 쓴 날도 바닥 막대로 꽉 채움
-    assert top == ""             # 상단은 전부 비어 rstrip 결과 빈 문자열
+def test_heatmap_all_zero_is_blank():
+    hm = render_heatmap([0] * 30)
+    assert len(hm) == 30
+    assert hm == " " * 30
 
 
-def test_graph_length_matches_input():
-    top, bot = render_graph([0] * 30)
-    assert len(bot) == 30
+def test_heatmap_length_matches_input():
+    hm = render_heatmap([0] * 30)
+    assert len(hm) == 30
 
 
-def test_graph_peak_fills_both_rows():
+def test_heatmap_max_value_is_darkest_shade():
     vals = [0] * 29 + [100]
-    top, bot = render_graph(vals)
-    assert bot[-1] == "█"        # 최댓값 -> 하단 꽉
-    assert top[-1] == "█"        # 최댓값 -> 상단도 꽉 (h==2)
+    hm = render_heatmap(vals)
+    assert hm[-1] == "█"
 
 
-def test_graph_half_max_only_bottom():
-    # 절반 값은 h==1.0 -> 하단 꽉, 상단 비움
-    top, bot = render_graph([50, 100] + [0] * 28)
-    assert bot[0] == "█"
-    assert top[:1] == " "        # 첫 칸 상단 공백
+def test_heatmap_small_nonzero_is_some_shade():
+    vals = [1] + [100] + [0] * 28
+    hm = render_heatmap(vals)
+    assert hm[0] in SHADE
+    assert hm[0] != " "
 
 
 def _mk(day, total, cost):
@@ -91,25 +90,24 @@ def _mk(day, total, cost):
             "cache_read": 0, "records": 1, "cost": cost}
 
 
-def test_render_card_has_six_lines_and_markers():
+def test_render_card_has_five_lines_and_markers():
     days = {"2026-07-18": _mk("d", 10_000_000, 2.0),
             "2026-07-15": _mk("d", 100_000_000, 20.0)}
     card = render_card(days, date(2026, 7, 18), "2026-07-18 13:40 KST")
     lines = card.rstrip("\n").split("\n")
-    assert len(lines) == 6
+    assert len(lines) == 5
     assert lines[0].startswith("📊 ")
     assert lines[1].startswith("🔥 today ")
-    assert lines[4].startswith("📅 avg ")
-    assert lines[5].startswith("🕐 updated ")
+    assert lines[3].startswith("📅 avg ")
+    assert lines[4].startswith("🕐 updated ")
 
 
-def test_render_card_graph_rows_have_no_text():
+def test_render_card_heatmap_row_has_no_text():
     days = {"2026-07-18": _mk("d", 10_000_000, 2.0)}
     card = render_card(days, date(2026, 7, 18), "2026-07-18 13:40 KST")
-    top, bot = card.split("\n")[2], card.split("\n")[3]
-    # 그래프 줄은 막대/공백만 (알파벳·이모지 없음)
-    assert all(ch in " " + "▁▂▃▄▅▆▇█" for ch in top)
-    assert all(ch in "▁▂▃▄▅▆▇█" for ch in bot)
+    heatmap = card.split("\n")[2]
+    # 히트맵 줄은 농도 문자/공백만 (알파벳·이모지 없음)
+    assert all(ch in " ░▒▓█" for ch in heatmap)
 
 
 def test_render_card_empty():
@@ -130,6 +128,30 @@ def test_aggregate_reads_usage_lines(tmp_path):
     days = aggregate(str(tmp_path))
     assert days["2026-07-18"]["input"] == 10
     assert days["2026-07-18"]["output"] == 20
+
+
+def test_aggregate_dedupes_by_message_id_and_request(tmp_path):
+    log = tmp_path / "proj" / "s.jsonl"
+    log.parent.mkdir(parents=True)
+    rows = [
+        # 같은 message.id + 같은 requestId -> 1회만 집계 (subagent/resume 중복 재생)
+        {"timestamp": "2026-07-17T16:00:00.000Z", "requestId": "req-1",
+         "message": {"id": "msg-1", "model": "claude-opus-4-8",
+                     "usage": {"input_tokens": 10, "output_tokens": 20}}},
+        {"timestamp": "2026-07-17T16:05:00.000Z", "requestId": "req-1",
+         "message": {"id": "msg-1", "model": "claude-opus-4-8",
+                     "usage": {"input_tokens": 10, "output_tokens": 20}}},
+        # 같은 message.id 지만 requestId 다름 -> 별개로 집계
+        {"timestamp": "2026-07-17T16:10:00.000Z", "requestId": "req-2",
+         "message": {"id": "msg-1", "model": "claude-opus-4-8",
+                     "usage": {"input_tokens": 10, "output_tokens": 20}}},
+    ]
+    log.write_text("\n".join(_json.dumps(r) for r in rows), encoding="utf-8")
+
+    days = aggregate(str(tmp_path))
+    d = days["2026-07-18"]
+    assert d["input"] == 20    # 10(req-1, 중복제거) + 10(req-2)
+    assert d["records"] == 2
 
 
 def test_upsert_latest_wins(tmp_path):

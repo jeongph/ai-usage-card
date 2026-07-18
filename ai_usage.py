@@ -111,24 +111,20 @@ def add_usage(days, ts, usage, model):
     rec["records"] += 1
 
 
-LEVELS = "▁▂▃▄▅▆▇█"
+SHADE = "░▒▓█"
 
 
-def render_graph(values):
-    """일별 값 리스트 -> (상단, 하단) 2줄 세로 막대.
-    그래프 줄에는 막대 문자만 담는다 (텍스트/이모지 금지)."""
+def render_heatmap(values):
+    """일별 값 리스트 -> 1줄 농도 히트맵. 0인 날은 공백, 그 외 농도 4단계."""
     maxv = max(values) if values else 0
     maxv = maxv or 1
-    top, bot = [], []
+    out = []
     for v in values:
-        h = v / maxv * 2.0
         if v == 0:
-            bot.append("▁")
+            out.append(" ")
         else:
-            bot.append(LEVELS[round(min(h, 1.0) * 7)])
-        ht = h - 1.0
-        top.append(" " if ht <= 0 else LEVELS[round(min(ht, 1.0) * 7)])
-    return "".join(top).rstrip(), "".join(bot)
+            out.append(SHADE[min(3, int(v / maxv * 4))])
+    return "".join(out)
 
 
 def human(n):
@@ -149,7 +145,6 @@ def render_card(days, today, updated_str):
     totals = {d: day_total(r) for d, r in days.items()}
     window = [today - timedelta(days=29 - i) for i in range(30)]
     vals = [totals.get(d.isoformat(), 0) for d in window]
-    top, bot = render_graph(vals)
 
     grand = sum(totals.values())
     total_cost = sum(float(r.get("cost") or 0) for r in days.values())
@@ -164,8 +159,7 @@ def render_card(days, today, updated_str):
     return "\n".join([
         f"📊 {human(grand)} tokens · ${total_cost:,.2f} · {active} days",
         f"🔥 today {human(today_v)} · peak {human(peak_v)} ({peak_lbl})",
-        top,
-        bot,
+        render_heatmap(vals),
         f"📅 avg {human(avg)}/day · ${cost_day:.0f}/day",
         f"🕐 updated {updated_str}",
     ]) + "\n"
@@ -173,6 +167,7 @@ def render_card(days, today, updated_str):
 
 def aggregate(root):
     days = {}
+    seen = set()
     for f in glob.glob(os.path.join(root, "**", "*.jsonl"), recursive=True):
         try:
             with open(f, encoding="utf-8") as fh:
@@ -189,6 +184,12 @@ def aggregate(root):
                     usage = msg.get("usage")
                     if not isinstance(usage, dict):
                         continue
+                    mid = msg.get("id")
+                    if mid is not None:
+                        key = (mid, o.get("requestId"))
+                        if key in seen:
+                            continue
+                        seen.add(key)
                     add_usage(days, o.get("timestamp"), usage, msg.get("model"))
         except Exception as e:
             print(f"read error {f}: {e}", file=sys.stderr)
