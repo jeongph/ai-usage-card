@@ -76,7 +76,7 @@ def test_render_card_has_six_lines_and_markers():
     assert lines[1].startswith("🔥 today ")
     assert lines[2].startswith("📈 this week ")
     assert lines[3].startswith("📅 avg ")
-    assert lines[4].startswith("⚡ ")
+    assert lines[4].startswith("🏃 ")
     assert lines[4].endswith("-day streak")
     assert lines[5].startswith("🕐 updated ")
 
@@ -111,7 +111,7 @@ def test_render_card_trend_and_streak():
     assert "▲100%" in lines[2]
     assert lines[2].startswith("📈 this week 7.0M")
     # streak: 07-18/17/16 은 값이 있고 07-15 가 비어(0) 있어 끊긴다 -> 3
-    assert lines[4] == "⚡ 3-day streak"
+    assert lines[4] == "🏃 3-day streak"
 
 
 def test_aggregate_reads_usage_lines(tmp_path):

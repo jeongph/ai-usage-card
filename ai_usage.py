@@ -162,7 +162,7 @@ def render_card(days, today, updated_str):
         f"🔥 today {human(today_v)} · peak {human(peak_v)} ({peak_lbl})",
         trend,
         f"📅 avg {human(avg)}/day · ${cost_day:.0f}/day",
-        f"⚡ {streak}-day streak",
+        f"🏃 {streak}-day streak",
         f"🕐 updated {updated_str}",
     ]) + "\n"
 
