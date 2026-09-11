@@ -1,6 +1,6 @@
 # ai-usage-card
 
-Claude Code 토큰 사용량을 GitHub 프로필 **pinned gist** 카드로 띄우는 단일 파이썬 스크립트.
+Claude Code 토큰 사용량을 집계해 GitHub 프로필에 고정한 Gist에 표시하는 Python 스크립트입니다.
 
 ```
 📊 2.9B tokens · $3,110 · 35 days
@@ -38,7 +38,7 @@ Claude Code 토큰 사용량을 GitHub 프로필 **pinned gist** 카드로 띄�
    ```sh
    python3 ~/ai-usage-card/src/ai_usage.py --push
    ```
-   끝에 `pushed`가 뜨면 성공. gist를 새로고침하면 카드가 보입니다.
+   출력 마지막에 `pushed`가 표시되면 업로드가 완료된 것입니다. Gist를 새로고침하면 카드를 확인할 수 있습니다.
 5. Claude Code Stop 훅 등록 — `~/.claude/settings.json`:
    ```json
    { "hooks": { "Stop": [ { "hooks": [
@@ -46,7 +46,7 @@ Claude Code 토큰 사용량을 GitHub 프로필 **pinned gist** 카드로 띄�
        "command": "AI_USAGE_GIST_ID=<복사한_ID> python3 $HOME/ai-usage-card/src/ai_usage.py --push --quiet" }
    ] } ] } }
    ```
-   응답이 끝날 때마다 실행되지만 **하루 1회만** 실제 push 합니다 (`.last_push` 디바운스).
+   응답이 끝날 때마다 실행되지만 **하루 1회만** 실제 push 합니다 (`.last_push`로 마지막 업로드 시각 확인).
 6. GitHub 프로필 → Customize your pins → 이 gist 선택.
 
 ## 옵션
@@ -67,11 +67,10 @@ Claude Code 토큰 사용량을 GitHub 프로필 **pinned gist** 카드로 띄�
 
 ## 동작 원리
 
-`~/.claude/projects/**/*.jsonl` 을 파싱해 날짜별 토큰을 합산합니다. **메시지 내용은 읽지 않고**
-timestamp·모델·usage 토큰 수만 사용합니다.
+`~/.claude/projects/**/*.jsonl` 을 파싱해 날짜별 토큰을 합산합니다. 집계에는 메시지 내용 대신 timestamp, 모델, usage의 토큰 수만 사용합니다.
 
 - **토큰** = `input + output + cache_creation + cache_read` (ccusage·ai-token-monitor와 동일 정의).
-- **중복 제거**: 재시도·분기·서브에이전트 replay로 생기는 중복 레코드는 `message.id + requestId` 로 dedup.
+- **중복 제거**: 재시도·분기·서브에이전트 replay로 생기는 중복 레코드는 `message.id + requestId` 로 중복 제거.
 - **비용**: 모델별 정가(list price)와 캐시 배수(cache write 1.25~2×, cache read 0.1×)로 환산.
 
 ## 개발
