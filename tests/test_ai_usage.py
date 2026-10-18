@@ -55,13 +55,13 @@ def test_record_cost_opus_input_output():
 
 
 def test_record_cost_cache_read_weighted():
-    # cache_read 는 input_rate * 0.10
+    # cache_read는 input_rate * 0.10
     cost = record_cost("claude-opus-4-8", {"cache_read_input_tokens": 1_000_000})
     assert round(cost, 6) == round(5.0 * 0.10, 6)
 
 
 def _mk(day, total, cost):
-    # 전량 input 으로 몰아 total 토큰을 맞춘 하루치 레코드
+    # 전량 input으로 몰아 total 토큰을 맞춘 하루치 레코드
     return {"input": total, "output": 0, "cache_creation": 0,
             "cache_read": 0, "records": 1, "cost": cost}
 
@@ -88,7 +88,7 @@ def test_render_card_empty():
 def test_render_card_trend_and_streak():
     today = date(2026, 7, 18)
     days = {}
-    # 최근 7일(07-12~07-18): 07-15만 기록이 없어(=0) streak 을 3에서 끊는다
+    # 최근 7일(07-12~07-18): 07-15만 기록이 없어(=0) streak을 3에서 끊는다
     for day, total in [
         ("2026-07-18", 2_000_000),
         ("2026-07-17", 1_000_000),
@@ -110,7 +110,7 @@ def test_render_card_trend_and_streak():
     # pct = (7.0M-3.5M)/3.5M*100 = +100% -> ▲
     assert "▲100%" in lines[2]
     assert lines[2].startswith("📈 this week 7.0M")
-    # streak: 07-18/17/16 은 값이 있고 07-15 가 비어(0) 있어 끊긴다 -> 3
+    # streak: 07-18/17/16은 값이 있고 07-15가 비어(0) 있어 끊긴다 -> 3
     assert lines[4] == "🏃 3-day streak"
 
 
@@ -141,7 +141,7 @@ def test_aggregate_dedupes_by_message_id_and_request(tmp_path):
         {"timestamp": "2026-07-17T16:05:00.000Z", "requestId": "req-1",
          "message": {"id": "msg-1", "model": "claude-opus-4-8",
                      "usage": {"input_tokens": 10, "output_tokens": 20}}},
-        # 같은 message.id 지만 requestId 다름 -> 별개로 집계
+        # 같은 message.id지만 requestId 다름 -> 별개로 집계
         {"timestamp": "2026-07-17T16:10:00.000Z", "requestId": "req-2",
          "message": {"id": "msg-1", "model": "claude-opus-4-8",
                      "usage": {"input_tokens": 10, "output_tokens": 20}}},
@@ -150,7 +150,7 @@ def test_aggregate_dedupes_by_message_id_and_request(tmp_path):
 
     days = aggregate(str(tmp_path))
     d = days["2026-07-18"]
-    assert d["input"] == 20    # 10(req-1, 중복제거) + 10(req-2)
+    assert d["input"] == 20    # 10(req-1, 중복 제거) + 10(req-2)
     assert d["records"] == 2
 
 

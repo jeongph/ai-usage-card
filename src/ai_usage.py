@@ -2,7 +2,7 @@
 """Claude Code AI 토큰 사용량 카드.
 
 pipeline: ~/.claude/projects/**/*.jsonl 파싱 -> 날짜별 토큰 집계
--> data.json 누적 -> 6줄 gist 카드 렌더 -> gh api 로 gist push.
+-> data.json 누적 -> 6줄 gist 카드 렌더 -> gh api로 gist push.
 메시지 내용은 읽지 않고 timestamp/model/usage 토큰 수만 사용한다.
 """
 
@@ -253,7 +253,7 @@ def main():
 
     if "--push" in argv and (not GIST_ID or "PUT_YOUR" in GIST_ID
                              or pushed_today(LAST_PUSH, today_str)):
-        return  # fast path: 오늘 이미 push 했으면 파싱도 건너뜀
+        return  # fast path: 오늘 이미 push했으면 파싱도 건너뜀
 
     fresh = aggregate(LOG_ROOT)
     store = upsert(fresh, DATA_PATH)

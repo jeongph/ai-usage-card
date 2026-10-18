@@ -30,7 +30,7 @@ Claude Code 토큰 사용량을 집계해 GitHub 프로필에 고정한 Gist에 
    gh gist create --public claude-code-usage
    ```
    출력 URL 끝의 ID를 복사합니다.
-3. 환경변수로 gist ID를 지정합니다 (셸 rc 파일에 추가):
+3. 환경 변수로 gist ID를 지정합니다 (셸 rc 파일에 추가):
    ```sh
    export AI_USAGE_GIST_ID=<복사한_ID>
    ```
@@ -39,21 +39,21 @@ Claude Code 토큰 사용량을 집계해 GitHub 프로필에 고정한 Gist에 
    python3 ~/ai-usage-card/src/ai_usage.py --push
    ```
    출력 마지막에 `pushed`가 표시되면 업로드가 완료된 것입니다. Gist를 새로고침하면 카드를 확인할 수 있습니다.
-5. Claude Code Stop 훅 등록 — `~/.claude/settings.json`:
+5. `~/.claude/settings.json`에 Claude Code Stop 훅을 등록합니다:
    ```json
    { "hooks": { "Stop": [ { "hooks": [
      { "type": "command",
        "command": "AI_USAGE_GIST_ID=<복사한_ID> python3 $HOME/ai-usage-card/src/ai_usage.py --push --quiet" }
    ] } ] } }
    ```
-   응답이 끝날 때마다 실행되지만 **하루 1회만** 실제 push 합니다 (`.last_push`로 마지막 업로드 시각 확인).
+   응답이 끝날 때마다 실행되지만 **하루 1회만** 실제로 push합니다 (`.last_push`로 마지막 업로드 시각 확인).
 6. GitHub 프로필 → Customize your pins → 이 gist 선택.
 
 ## 옵션
 
 - 타임존: `src/ai_usage.py` 상단 `TZ_NAME` 수정 (기본 `Asia/Seoul`).
 - 강제 재갱신: `rm ~/ai-usage-card/.last_push && python3 ~/ai-usage-card/src/ai_usage.py --push`
-- 로그 보관 연장(선택): `~/.claude/settings.json` 에 `{ "cleanupPeriodDays": 90 }`.
+- 로그 보관 연장(선택): `~/.claude/settings.json`에 `{ "cleanupPeriodDays": 90 }`.
 
 ## 카드에 표시되는 것
 
@@ -67,15 +67,15 @@ Claude Code 토큰 사용량을 집계해 GitHub 프로필에 고정한 Gist에 
 
 ## 동작 원리
 
-`~/.claude/projects/**/*.jsonl` 을 파싱해 날짜별 토큰을 합산합니다. 집계에는 메시지 내용 대신 timestamp, 모델, usage의 토큰 수만 사용합니다.
+`~/.claude/projects/**/*.jsonl`을 파싱해 날짜별 토큰을 합산합니다. 집계에는 메시지 내용 대신 timestamp, 모델, usage의 토큰 수만 사용합니다.
 
-- **토큰** = `input + output + cache_creation + cache_read` (ccusage·ai-token-monitor와 동일 정의).
-- **중복 제거**: 재시도·분기·서브에이전트 replay로 생기는 중복 레코드는 `message.id + requestId` 로 중복 제거.
+- **토큰** = `input + output + cache_creation + cache_read` (ccusage, ai-token-monitor와 동일한 정의).
+- **중복 제거**: 재시도, 분기, 서브에이전트 replay로 생기는 중복 레코드는 `message.id + requestId`로 제거.
 - **비용**: 모델별 정가(list price)와 캐시 배수(cache write 1.25~2×, cache read 0.1×)로 환산.
 
 ## 개발
 
 ```sh
 pip install -r requirements-dev.txt
-python3 -m pytest          # pytest.ini 의 pythonpath=src 로 src 를 인식
+python3 -m pytest          # pytest.ini의 pythonpath=src로 src를 인식
 ```
